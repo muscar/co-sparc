@@ -8,14 +8,27 @@
     t 0x6d
 .endm
 
+.macro co_init l r
+    set \l, \r
+.endm
+
 .macro co_yield t r
     jmpl \t, \r
     add \r, 8, \r
 .endm
 
+.macro co_done t r
+    jmpl \t, \r
+    restore
+.endm
+
 .register %g2, #scratch
 .register %g3, #scratch
 .register %g6, #scratch
+
+#define co_main %g6
+#define co_a %g2
+#define co_b %g3
 
     .section ".text"
     .align 4
@@ -25,12 +38,10 @@
 _start:
     save %sp, -64, %sp
 
-    set a, %g2
-    set b, %g3
+    co_init a, co_a
+    co_init b, co_b
 
-    ! jmpl %g2, %g6
-    ! add %g6, 8, %g6
-    co_yield %g2, %g6
+    co_yield co_a, co_main
 
     syscall SYS_exit
 
@@ -42,22 +53,17 @@ a:
     mov (end_msg_a1-msg_a1), %o2
     syscall SYS_write
 
-    ! jmpl %g3, %g2
-    ! add %g2, 8, %g2
-    co_yield %g3, %g2
+    co_yield co_b, co_a
 
     mov STDOUT, %o0
     set msg_a2, %o1
     mov (end_msg_a2-msg_a2), %o2
     syscall SYS_write
 
-    ! jmpl %g3, %g2
-    ! add %g2, 8, %g2
-    co_yield %g3, %g2
+    co_yield co_b, co_a
 
     mov 10, %i0
-    jmpl %g6, %g0
-    restore
+    co_done co_main, co_a
 
 b:
     save %sp, -64, %sp
@@ -67,9 +73,7 @@ b:
     mov (end_msg_b1-msg_b1), %o2
     syscall SYS_write
 
-    ! jmpl %g2, %g3
-    ! add %g3, 8, %g3
-    co_yield %g2, %g3
+    co_yield co_a, co_b
 
     mov STDOUT, %o0
     set msg_b2, %o1
@@ -77,8 +81,7 @@ b:
     syscall SYS_write
 
     mov 20, %i0
-    jmpl %g2, %g0
-    restore
+    co_done co_a, co_b
 
     .section ".data"
     .align 4
